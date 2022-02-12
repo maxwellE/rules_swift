@@ -202,6 +202,11 @@ SWIFT_FEATURE_USE_RESPONSE_FILES = "swift.use_response_files"
 # when access to those paths involves traversing a networked file system.
 SWIFT_FEATURE_VFSOVERLAY = "swift.vfsoverlay"
 
+# If enabled, Swift compilation actions will use a explicit module map file for
+# discovering dependencies. This is faster than using search paths when you
+# have many dependencies. This doesn't apply to system dependencies.
+SWIFT_FEATURE_PARTIALLY_EXPLICIT_MODULES = "swift.partially_explicit_modules"
+
 # If enabled, builds using the "dbg" compilation mode will explicitly disable
 # swiftc from producing swiftmodules containing embedded file paths, which are
 # inherently non-portable across machines.

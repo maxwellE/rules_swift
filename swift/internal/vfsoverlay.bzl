@@ -62,3 +62,27 @@ def write_vfsoverlay(
         content = vfsoverlay_yaml,
         output = vfsoverlay_file,
     )
+
+def write_explicit_module_map(
+        actions,
+        swiftmodules,
+        output_file):
+    """Generates a explicit module map and writes it to a file.
+
+    Args:
+        actions: The object used to register actions.
+        swiftmodules: The `list` of transitive `.swiftmodule` dependencies.
+        output_file: A `File` to write the output to.
+    """
+    virtual_swiftmodules = [
+        {
+            "moduleName": swiftmodule.basename.rsplit(".", 1)[0],
+            "modulePath": swiftmodule.path,
+        }
+        for swiftmodule in swiftmodules
+    ]
+
+    actions.write(
+        content = json.encode(virtual_swiftmodules),
+        output = output_file,
+    )

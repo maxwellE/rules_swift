@@ -294,6 +294,23 @@ def _vfsoverlay(actions, target_name):
     """
     return actions.declare_file("{}.vfsoverlay.yaml".format(target_name))
 
+def _explicit_module_map(actions, target_name):
+    """Declares a file for the explicit module map confoiguration for a
+    compilation action.
+
+    The explicit module map file is JSON-formatted file that allows us to place
+    the `.swiftmodule` files for all dependencies into a single file used for
+    lookup instead of discovering them through search paths.
+
+    Args:
+        actions: The context's actions object.
+        target_name: The name of the target being built.
+
+    Returns:
+        The declared `File`.
+    """
+    return actions.declare_file("{}.explicitmodulemap.json".format(target_name))
+
 def _whole_module_object_file(actions, target_name):
     """Declares a file for object files created with whole module optimization.
 
@@ -326,6 +343,7 @@ derived_files = struct(
     ast = _ast,
     autolink_flags = _autolink_flags,
     executable = _executable,
+    explicit_module_map = _explicit_module_map,
     indexstore_directory = _indexstore_directory,
     intermediate_bc_file = _intermediate_bc_file,
     intermediate_object_file = _intermediate_object_file,
@@ -334,8 +352,8 @@ derived_files = struct(
     precompiled_module = _precompiled_module,
     reexport_modules_src = _reexport_modules_src,
     static_archive = _static_archive,
-    swiftc_output_file_map = _swiftc_output_file_map,
     swiftc_derived_output_file_map = _swiftc_derived_output_file_map,
+    swiftc_output_file_map = _swiftc_output_file_map,
     swiftdoc = _swiftdoc,
     swiftinterface = _swiftinterface,
     swiftmodule = _swiftmodule,
