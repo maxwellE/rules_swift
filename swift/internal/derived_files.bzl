@@ -295,7 +295,7 @@ def _vfsoverlay(actions, target_name):
     return actions.declare_file("{}.vfsoverlay.yaml".format(target_name))
 
 def _explicit_module_map(actions, target_name):
-    """Declares a file for the explicit module map confoiguration for a
+    """Declares a file for the explicit module map configuration for a
     compilation action.
 
     The explicit module map file is JSON-formatted file that allows us to place
