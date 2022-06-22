@@ -175,17 +175,20 @@ def _swift_library_impl(ctx):
     module_context, cc_compilation_outputs, other_compilation_outputs = swift_common.compile(
         actions = ctx.actions,
         additional_inputs = additional_inputs,
+        apple_fragment = ctx.fragments.apple,
         copts = _maybe_parse_as_library_copts(srcs) + copts,
         defines = ctx.attr.defines,
         deps = deps,
         feature_configuration = feature_configuration,
         generated_header_name = generated_header_name,
+        is_test = ctx.attr.testonly,
         module_name = module_name,
         private_deps = private_deps,
         srcs = srcs,
         swift_toolchain = swift_toolchain,
         target_name = ctx.label.name,
         workspace_name = ctx.workspace_name,
+        xcode_config = ctx.attr._xcode_config
     )
 
     linking_context, linking_output = (
@@ -290,6 +293,12 @@ dependent for linking, but artifacts/flags required for compilation (such as
 .swiftmodule files, C headers, and search paths) will not be propagated.
 """,
             ),
+            "_xcode_config": attr.label(
+                default = configuration_field(
+                    name = "xcode_config_label",
+                    fragment = "apple",
+                ),
+            ),
         },
     ),
     doc = """\
@@ -297,5 +306,5 @@ Compiles and links Swift code into a static library and Swift module.
 """,
     outputs = swift_library_output_map,
     implementation = _swift_library_impl,
-    fragments = ["cpp"],
+    fragments = ["apple", "cpp"],
 )

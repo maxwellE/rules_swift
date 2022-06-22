@@ -490,6 +490,17 @@ def compile_action_configs(
             features = [SWIFT_FEATURE_ENABLE_TESTING],
         ),
 
+
+        swift_toolchain_config.action_config(
+            actions = [
+                swift_action_names.COMPILE,
+                swift_action_names.DERIVE_FILES,
+                swift_action_names.PRECOMPILE_C_MODULE,
+                swift_action_names.DUMP_AST,
+            ],
+            configurators = [_developer_framework_paths_configurator],
+        ),
+
         # Emit appropriate levels of debug info. On Apple platforms, requesting
         # dSYMs (regardless of compilation mode) forces full debug info because
         # `dsymutil` produces spurious warnings about symbols in the debug map
@@ -1132,6 +1143,128 @@ def _output_or_file_map(output_file_map, outputs, args):
 
     args.add("-o", outputs[0])
     return None
+
+def _swift_developer_lib_dir(platform_framework_dir):
+    """Returns the directory containing extra Swift developer libraries.
+
+    Args:
+        platform_framework_dir: The developer platform framework directory for
+            the current platform.
+
+    Returns:
+        The directory containing extra Swift-specific development libraries and
+        swiftmodules.
+    """
+    return paths.join(
+        paths.dirname(paths.dirname(platform_framework_dir)),
+        "usr",
+        "lib",
+    )
+
+def _platform_developer_framework_dir(
+        apple_toolchain,
+        apple_fragment,
+        xcode_config):
+    """Returns the Developer framework directory for the platform.
+
+    Args:
+        apple_fragment: The `apple` configuration fragment.
+        apple_toolchain: The `apple_common.apple_toolchain()` object.
+        xcode_config: The Xcode configuration.
+
+    Returns:
+        The path to the Developer framework directory for the platform if one
+        exists, otherwise `None`.
+    """
+
+    # All platforms have a `Developer/Library/Frameworks` directory in their
+    # platform root, except for watchOS prior to Xcode 12.5.
+    platform_type = apple_fragment.single_arch_platform.platform_type
+    if (
+        platform_type == apple_common.platform_type.watchos and
+        not is_xcode_at_least_version(xcode_config, "12.5")
+    ):
+        return None
+
+    return apple_toolchain.platform_developer_framework_dir(apple_fragment)
+
+def _sdk_developer_framework_dir(apple_toolchain, apple_fragment, xcode_config):
+    """Returns the Developer framework directory for the SDK.
+
+    Args:
+        apple_fragment: The `apple` configuration fragment.
+        apple_toolchain: The `apple_common.apple_toolchain()` object.
+        xcode_config: The Xcode configuration.
+
+    Returns:
+        The path to the Developer framework directory for the SDK if one
+        exists, otherwise `None`.
+    """
+
+    # All platforms have a `Developer/Library/Frameworks` directory in their SDK
+    # root except for macOS (all versions of Xcode so far), and watchOS (prior
+    # to Xcode 12.5).
+    platform_type = apple_fragment.single_arch_platform.platform_type
+    if (
+        platform_type == apple_common.platform_type.macos or
+        (
+            platform_type == apple_common.platform_type.watchos and
+            not is_xcode_at_least_version(xcode_config, "12.5")
+        )
+    ):
+        return None
+
+    return paths.join(apple_toolchain.sdk_dir(), "Developer/Library/Frameworks")
+
+def is_xcode_at_least_version(xcode_config, desired_version):
+    """Returns True if we are building with at least the given Xcode version.
+
+    Args:
+        xcode_config: The `apple_common.XcodeVersionConfig` provider.
+        desired_version: The minimum desired Xcode version, as a dotted version
+            string.
+
+    Returns:
+        True if the current target is being built with a version of Xcode at
+        least as high as the given version.
+    """
+    current_version = xcode_config.xcode_version()
+    if not current_version:
+        fail("Could not determine Xcode version at all. This likely means " +
+             "Xcode isn't available; if you think this is a mistake, please " +
+             "file an issue.")
+
+    desired_version_value = apple_common.dotted_version(desired_version)
+    return current_version >= desired_version_value
+
+# The platform developer framework directory contains XCTest.swiftmodule
+# with Swift extensions to XCTest, so it needs to be added to the search
+# path on platforms where it exists.
+def _developer_framework_paths_configurator(prerequisites, args):
+    """ Adds developer frameworks flags to the command line. """
+    if prerequisites.is_test:
+        apple_toolchain = apple_common.apple_toolchain()
+        platform_developer_framework_dir = _platform_developer_framework_dir(
+            apple_toolchain,
+            prerequisites.apple_fragment,
+            prerequisites.xcode_config,
+        )
+        sdk_developer_framework_dir = _sdk_developer_framework_dir(
+            apple_toolchain,
+            prerequisites.apple_fragment,
+            prerequisites.xcode_config,
+        )
+        framework_paths = compact([
+            platform_developer_framework_dir,
+            sdk_developer_framework_dir,
+        ])
+        args.add_all(framework_paths, before_each = "-Xcc", format_each = "-F%s")
+        # Add the linker path to the directory containing the dylib with Swift
+        # extensions for the XCTest module.
+        if platform_developer_framework_dir:
+            swift_developer_lib_dir_path = _swift_developer_lib_dir(platform_developer_framework_dir)
+            args.add(swift_developer_lib_dir_path, format = "-L%s")
+            args.add(swift_developer_lib_dir_path, format = "-I%s")
 
 def _output_object_or_file_map_configurator(prerequisites, args):
     """Adds the output file map or single object file to the command line."""
@@ -1790,17 +1923,20 @@ def compile(
         *,
         actions,
         additional_inputs = [],
+        apple_fragment,
         copts = [],
         defines = [],
         deps = [],
         feature_configuration,
         generated_header_name = None,
+        is_test,
         module_name,
         private_deps = [],
         srcs,
         swift_toolchain,
         target_name,
-        workspace_name):
+        workspace_name,
+        xcode_config):
     """Compiles a Swift module.
 
     Args:
@@ -1808,6 +1944,7 @@ def compile(
         additional_inputs: A list of `File`s representing additional input files
             that need to be passed to the Swift compile action because they are
             referenced by compiler flags.
+        apple_fragment: The `apple` configuration fragment.
         copts: A list of compiler flags that apply to the target being built.
             These flags, along with those from Bazel's Swift configuration
             fragment (i.e., `--swiftcopt` command line flags) are scanned to
@@ -1824,6 +1961,7 @@ def compile(
         generated_header_name: The name of the Objective-C generated header that
             should be generated for this module. If omitted, no header will be
             generated.
+        is_test: Represents if `testonly` is set on the target to be compiled.
         module_name: The name of the Swift module being compiled. This must be
             present and valid; use `swift_common.derive_module_name` to generate
             a default from the target's label if needed.
@@ -1840,6 +1978,7 @@ def compile(
         workspace_name: The name of the workspace for which the code is being
              compiled, which is used to determine unique file paths for some
              outputs.
+        xcode_config: The Xcode configuration.
 
     Returns:
         A tuple containing three elements:
@@ -1974,11 +2113,13 @@ def compile(
 
     prerequisites = struct(
         additional_inputs = additional_inputs,
+        apple_fragment = apple_fragment,
         bin_dir = feature_configuration._bin_dir,
         cc_compilation_context = merged_providers.cc_info.compilation_context,
         defines = sets.to_list(defines_set),
         genfiles_dir = feature_configuration._genfiles_dir,
         is_swift = True,
+        is_test = is_test,
         module_name = module_name,
         objc_include_paths_workaround = (
             merged_providers.objc_include_paths_workaround
@@ -1991,6 +2132,7 @@ def compile(
         vfsoverlay_file = vfsoverlay_file,
         vfsoverlay_search_path = _SWIFTMODULES_VFS_ROOT,
         workspace_name = workspace_name,
+        xcode_config = xcode_config,
         # Merge the compile outputs into the prerequisites.
         **struct_fields(compile_outputs)
     )

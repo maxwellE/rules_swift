@@ -412,14 +412,17 @@ def _swift_protoc_gen_aspect_impl(target, aspect_ctx):
 
         module_context, cc_compilation_outputs, other_compilation_outputs = swift_common.compile(
             actions = aspect_ctx.actions,
+            apple_fragment = aspect_ctx.fragments.apple,
             copts = ["-parse-as-library"],
             deps = proto_deps + support_deps,
             feature_configuration = feature_configuration,
+            is_test = False,
             module_name = module_name,
             srcs = pbswift_files,
             swift_toolchain = swift_toolchain,
             target_name = target.label.name,
             workspace_name = aspect_ctx.workspace_name,
+            xcode_config = aspect_ctx.attr._xcode_config
         )
 
         linking_context, linking_output = (
@@ -578,6 +581,12 @@ swift_protoc_gen_aspect = aspect(
                 default = Label("@com_github_apple_swift_protobuf//:ProtoCompilerPlugin_wrapper"),
                 executable = True,
             ),
+            "_xcode_config": attr.label(
+                default = configuration_field(
+                    name = "xcode_config_label",
+                    fragment = "apple",
+                ),
+            ),
         },
     ),
     doc = """\
@@ -591,6 +600,6 @@ provider.
 Most users should not need to use this aspect directly; it is an implementation
 detail of the `swift_proto_library` rule.
 """,
-    fragments = ["cpp"],
+    fragments = ["apple", "cpp"],
     implementation = _swift_protoc_gen_aspect_impl,
 )
