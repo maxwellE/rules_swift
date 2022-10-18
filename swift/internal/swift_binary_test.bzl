@@ -39,6 +39,7 @@ def _binary_rule_attrs(stamp_default):
             requires_srcs = False,
         ),
         {
+            "env": attr.string_dict(),
             "linkopts": attr.string_list(
                 doc = """\
 Additional linker options that should be passed to `clang`. These strings are
@@ -416,6 +417,7 @@ def _swift_test_impl(ctx):
     test_environment = dicts.add(
         swift_toolchain.test_configuration.env,
         {"TEST_BINARIES_FOR_LLVM_COV": linking_outputs.executable.short_path},
+        ctx.attr.env
     )
 
     return providers + [

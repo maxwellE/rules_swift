@@ -8,6 +8,9 @@ swift_test(
         "SimpleTests.swift",
         "main.swift",
     ],
+    env = {
+        "XCTEST_ENV_VAR": "TRUE"
+    }
 )
 
 swift_test(
