@@ -31,3 +31,13 @@ http_archive(
         "https://github.com/bazelbuild/stardoc/releases/download/0.5.3/stardoc-0.5.3.tar.gz",
     ],
 )
+
+http_archive(
+    name = "com_github_peripheryapp",
+    url = "https://github.com/peripheryapp/periphery/releases/download/2.12.0/periphery-v2.12.0.zip",
+    sha256 = "2ac3a7bc7117193696e2d2676c6aa91187d93f5e03412f8e99459c923e550e12",
+    type = "zip",
+    build_file_content = """
+exports_files(["periphery"])
+    """
+)

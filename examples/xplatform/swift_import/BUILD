@@ -12,6 +12,7 @@ swift_library(
     deps = [
         ":import",
     ],
+    module_name = "main",
 )
 
 swift_import(

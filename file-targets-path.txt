@@ -1,0 +1,6 @@
+{
+  "file_targets": {
+    "examples/xplatform/swift_import/dep.swift": ["dep"],
+    "examples/xplatform/swift_import/main.swift": ["main"]
+  }
+}
