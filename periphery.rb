@@ -1,7 +1,6 @@
 require "open3"
 
 bazel_path = ARGV.first
-periphery_path = ARGV[1]
 tmpdir = `mktemp -d`.strip
 
 `#{bazel_path} build //examples/xplatform/swift_import/... --build_event_text_file="#{tmpdir}/periphery_bep.text" --features=swift.index_while_building --output_groups=+swift_index_store`
